@@ -9,7 +9,13 @@
     "seed": "npm --prefix backend run seed",
     "build": "npm --prefix frontend run build"
   },
-  "keywords": ["matrimony", "react", "express", "mongodb", "fullstack"],
+  "keywords": [
+    "matrimony",
+    "react",
+    "express",
+    "mongodb",
+    "fullstack"
+  ],
   "author": "SS Matrimony Team",
   "license": "ISC",
   "devDependencies": {

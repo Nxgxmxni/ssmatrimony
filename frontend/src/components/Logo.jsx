@@ -13,7 +13,7 @@ export default function Logo({ height = 76, variant = 'light', showTagline = tru
     >
       <img
         src="/ss_logo.png"
-        alt="SS MATRIMONY - CONNECTING HEARTS, CREATING FUTURES"
+        alt="SS MATRIMONY - YOUR PARTNER FOR A LIFETIME"
         style={{
           height: `${height}px`,
           width: 'auto',

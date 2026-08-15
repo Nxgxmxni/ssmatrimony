@@ -354,6 +354,27 @@ export default function SuccessStoriesPage() {
             </div>
           ))}
         </div>
+
+        {/* View More Success Stories Action */}
+        <div style={{ textAlign: 'center', marginTop: '2.5rem' }}>
+          <Link
+            to="/success-stories/all"
+            className="btn-gold"
+            style={{
+              padding: '0.85rem 2.25rem',
+              borderRadius: '50px',
+              fontWeight: '800',
+              fontSize: '1rem',
+              boxShadow: '0 8px 20px rgba(212, 160, 23, 0.3)',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            View More Success Stories <ArrowRight size={18} />
+          </Link>
+        </div>
       </section>
 
       {/* SECTION 4: Our Promise */}

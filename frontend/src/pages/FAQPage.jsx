@@ -18,8 +18,8 @@ export default function FAQPage() {
       answer: 'Yes! SS Matrimony provides complete privacy controls. You can choose to hide your phone number and email address from public view, or set photo privacy to "Visible Only to Accepted Connections" from your Privacy Settings dashboard.'
     },
     {
-      question: 'What is the Compatibility Match Score percentage?',
-      answer: 'Our smart recommendation algorithm calculates a match score (0% to 98%) based on mutual parameters: age preferences, height range, religion, education alignment, marital status, and location preferences.'
+      question: 'How are profile recommendations prioritized?',
+      answer: 'Our smart recommendation algorithm orders profiles based on mutual parameters: age preferences, height range, religion, education alignment, marital status, and location preferences.'
     },
     {
       question: 'How does Express Interest and Messaging work?',

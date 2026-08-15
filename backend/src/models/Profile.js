@@ -5,9 +5,31 @@ const profileSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
-      unique: true,
+      required: false,
+      default: null,
+      sparse: true,
     },
+    customId: {
+      type: String,
+      default: '',
+      index: true,
+    },
+    profileSource: {
+      type: String,
+      enum: ['Admin Imported', 'Registered User'],
+      default: 'Registered User',
+    },
+    status: {
+      type: String,
+      enum: ['Draft', 'Pending Review', 'Approved', 'Rejected', 'Suspended'],
+      default: 'Approved',
+    },
+    // Admin Only Contact Information (NEVER exposed to normal users)
+    contactPhone: { type: String, default: '' },
+    contactAltPhone: { type: String, default: '' },
+    contactEmail: { type: String, default: '' },
+    contactAddress: { type: String, default: '' },
+
     fullName: {
       type: String,
       required: [true, 'Full name is required'],
@@ -15,8 +37,12 @@ const profileSchema = new mongoose.Schema(
     },
     gender: {
       type: String,
-      enum: ['bride', 'groom', ''],
+      enum: ['bride', 'groom', 'male', 'female', 'Bride', 'Groom', 'Male', 'Female', ''],
       default: '',
+    },
+    profileCreatedFor: {
+      type: String,
+      default: 'Self',
     },
     dateOfBirth: {
       type: Date,
@@ -29,6 +55,10 @@ const profileSchema = new mongoose.Schema(
     heightCm: {
       type: Number,
       default: null,
+    },
+    height: {
+      type: String,
+      default: '',
     },
     weightKg: {
       type: Number,
@@ -74,6 +104,10 @@ const profileSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    additionalEducation: {
+      type: String,
+      default: '',
+    },
     occupation: {
       type: String,
       default: '',
@@ -83,6 +117,10 @@ const profileSchema = new mongoose.Schema(
       default: '',
     },
     company: {
+      type: String,
+      default: '',
+    },
+    workLocation: {
       type: String,
       default: '',
     },
@@ -102,6 +140,10 @@ const profileSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    address: {
+      type: String,
+      default: '',
+    },
     // Family Details
     fatherName: { type: String, default: '' },
     fatherOccupation: { type: String, default: '' },
@@ -109,65 +151,50 @@ const profileSchema = new mongoose.Schema(
     motherOccupation: { type: String, default: '' },
     brothersCount: { type: Number, default: 0 },
     sistersCount: { type: Number, default: 0 },
-    familyType: {
-      type: String,
-      default: '',
-    },
-    familyStatus: {
-      type: String,
-      default: '',
-    },
-    familyValues: {
-      type: String,
-      default: '',
-    },
-    siblings: {
-      type: String,
-      default: '',
-    },
-    // Lifestyle & Habits
-    foodPreference: {
-      type: String,
-      default: '',
-    },
-    smoking: {
-      type: String,
-      default: '',
-    },
-    drinking: {
-      type: String,
-      default: '',
-    },
-    hobbies: {
-      type: [String],
-      default: [],
-    },
-    interests: {
-      type: [String],
-      default: [],
-    },
+    siblings: { type: String, default: '' },
+    siblingDetails: { type: String, default: '' },
+    familyBackground: { type: String, default: '' },
+    familyType: { type: String, default: '' },
+    familyStatus: { type: String, default: '' },
+    familyValues: { type: String, default: '' },
+    nativePlace: { type: String, default: '' },
+    propertiesAssets: { type: String, default: '' },
+
+    // Lifestyle & Details
+    foodPreference: { type: String, default: '' },
+    smoking: { type: String, default: '' },
+    drinking: { type: String, default: '' },
+    complexion: { type: String, default: '' },
+    lifestyle: { type: String, default: '' },
+    hobbies: { type: [String], default: [] },
+    interests: { type: [String], default: [] },
+
     // Horoscope / Astro Details
     rashi: { type: String, default: '' },
     nakshatram: { type: String, default: '' },
-    manglikStatus: {
-      type: String,
-      default: '',
-    },
-    aboutMe: {
-      type: String,
-      default: '',
-    },
+    manglikStatus: { type: String, default: '' },
+    placeOfBirth: { type: String, default: '' },
+    timeOfBirth: { type: String, default: '' },
+    horoscopeNotes: { type: String, default: '' },
+    horoscopeDetails: { type: String, default: '' },
+
+    aboutMe: { type: String, default: '' },
+    additionalInformation: { type: String, default: '' },
+
     partnerExpectations: {
       minAge: { type: Number, default: null },
       maxAge: { type: Number, default: null },
       preferredMinHeightCm: { type: Number, default: null },
       preferredMaxHeightCm: { type: Number, default: null },
+      preferredAge: { type: String, default: '' },
+      preferredHeight: { type: String, default: '' },
       religion: { type: String, default: '' },
       preferredCaste: { type: String, default: '' },
       maritalStatus: { type: String, default: '' },
       education: { type: String, default: '' },
       preferredOccupation: { type: String, default: '' },
       location: { type: String, default: '' },
+      otherExpectations: { type: String, default: '' },
     },
     photos: {
       type: [String],
@@ -183,9 +210,46 @@ const profileSchema = new mongoose.Schema(
     },
     idVerificationStatus: {
       type: String,
-      enum: ['Unverified', 'Pending', 'Verified', 'Rejected'],
+      enum: ['Unverified', 'Pending', 'Verified', 'Rejected', 'ReuploadRequested'],
       default: 'Unverified',
     },
+    verificationNote: {
+      type: String,
+      default: '',
+    },
+    rejectionReason: {
+      type: String,
+      default: '',
+    },
+    reuploadReason: {
+      type: String,
+      default: '',
+    },
+    govtDocType: {
+      type: String,
+      default: 'Aadhaar',
+    },
+    govtDocNumber: {
+      type: String,
+      default: '',
+    },
+    verifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    verifiedAt: {
+      type: Date,
+      default: null,
+    },
+    verificationAuditLog: [
+      {
+        action: String,
+        adminEmail: String,
+        reason: String,
+        timestamp: { type: Date, default: Date.now },
+      },
+    ],
     privacy: {
       hidePhone: { type: Boolean, default: false },
       hideEmail: { type: Boolean, default: false },
@@ -199,6 +263,10 @@ const profileSchema = new mongoose.Schema(
     wizardStep: {
       type: Number,
       default: 1,
+    },
+    lastCompletedStep: {
+      type: Number,
+      default: 0,
     },
     isWizardCompleted: {
       type: Boolean,

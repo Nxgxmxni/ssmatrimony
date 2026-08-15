@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Phone, Mail, Clock, Send, CheckCircle2, MessageSquare, HelpCircle, Users } from 'lucide-react';
+import { adminAPI } from '../services/api';
 
 // Official SS Matrimony Contact Details
 const CUSTOMER_SUPPORT_PHONE = "+91 78930 69580";
@@ -18,20 +19,28 @@ export default function Contact() {
   const [subjectError, setSubjectError] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.subject) {
       setSubjectError('Please select a subject.');
       return;
     }
     setSubjectError('');
+    setApiError('');
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+
+    try {
+      await adminAPI.submitContact(formData);
       setSubmitted(true);
       setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
-    }, 600);
+    } catch (err) {
+      console.error('Contact Form Submit Error:', err);
+      setApiError(err.response?.data?.message || 'Failed to submit message. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

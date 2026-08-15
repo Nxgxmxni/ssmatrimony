@@ -152,11 +152,10 @@ To send real emails for email verification and password resets:
 
 ### 2. Login Flow
 - Navigate to `http://localhost:5173/login`.
-- Enter email (or mobile phone number) and password.
-- Test quick demo login buttons:
-  - **Groom**: `rahul.sharma@example.com` / `password123`
-  - **Bride**: `priya.verma@example.com` / `password123`
-  - **Admin**: `admin@ssmatrimony.com` / `admin123`
+- Enter registered email or mobile phone and password.
+- Sign in with real MongoDB administrator credentials:
+  - **Admin Email**: `admin@ssmatrimony.com`
+  - **Admin Password**: `Admin@123`
 
 ### 3. Forgot & Reset Password Flow
 - Go to `/forgot-password`, enter email, and click **Send Reset Link**.
@@ -177,7 +176,10 @@ To send real emails for email verification and password resets:
 ## 🚀 Quick Commands
 
 ```bash
-# Seed database with sample profiles & admin user
+# Seed database with initial real Administrator account (admin@ssmatrimony.com / Admin@123)
+npm run seed:admin --prefix backend
+
+# Seed database with sample profiles
 npm run seed --prefix backend
 
 # Start backend server (Port 5000)

@@ -131,30 +131,6 @@ export default function ProfileDetail() {
               </div>
             )}
           </div>
-
-          {/* Match Score Card */}
-          <div className="glass-card" style={{ padding: '1.5rem', marginTop: '1.5rem', background: 'linear-gradient(135deg, #fff9e6 0%, #ffffff 100%)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-              <div style={{ fontWeight: '700', color: '#800020', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Sparkles size={18} color="#d4af37" /> Match Compatibility
-              </div>
-              <span style={{ fontSize: '1.4rem', fontWeight: '800', color: '#d4af37' }}>
-                {profile.matchPercentage}%
-              </span>
-            </div>
-            <div style={{ height: '8px', backgroundColor: '#e5e7eb', borderRadius: '4px', overflow: 'hidden' }}>
-              <div
-                style={{
-                  height: '100%',
-                  width: `${profile.matchPercentage}%`,
-                  background: 'linear-gradient(90deg, #d4af37 0%, #800020 100%)',
-                }}
-              />
-            </div>
-            <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.5rem' }}>
-              Score calculated based on age preference, religion, location, and education alignment.
-            </p>
-          </div>
         </div>
 
         {/* Right Column: Detailed Breakdown */}
@@ -170,8 +146,16 @@ export default function ProfileDetail() {
                   {profile.age} yrs • {profile.heightCm} cm ({profile.weightKg || 60} kg) • {profile.city}, {profile.state}
                 </div>
                 {profile.user && (
-                  <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.4rem' }}>
-                    Contact: {profile.user.phone || 'Hidden'} • Email: {profile.user.email || 'Hidden'}
+                  <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.4rem', fontWeight: '600' }}>
+                    {profile.user.mobile || profile.user.phone ? (
+                      <span style={{ color: '#166534', backgroundColor: '#DCFCE7', padding: '0.2rem 0.6rem', borderRadius: '12px' }}>
+                        📞 Contact Details Approved by Admin: {profile.user.mobile || profile.user.phone} • {profile.user.email}
+                      </span>
+                    ) : (
+                      <span style={{ color: '#0B3B91' }}>
+                        🔒 Phone & Email Hidden (Communication Managed Exclusively by SS Matrimony Admin)
+                      </span>
+                    )}
                   </div>
                 )}
               </div>

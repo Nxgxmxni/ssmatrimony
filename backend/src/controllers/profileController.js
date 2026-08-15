@@ -26,24 +26,37 @@ const getProfiles = async (req, res) => {
       limit = 12,
     } = req.query;
 
+    // Find all admin user IDs to exclude admin profiles from matchmaking
+    const adminUsers = await User.find({ role: 'admin' }).select('_id');
+    const adminUserIds = adminUsers.map((u) => u._id);
+
     const query = {
       'privacy.hideFromSearch': { $ne: true }, // Exclude hidden profiles
+      status: { $in: ['Approved', undefined, null] }, // Only Approved profiles are visible
     };
+
+    if (adminUserIds.length > 0) {
+      query.user = { $nin: adminUserIds };
+    }
 
     let currentUserProfile = null;
     if (req.user) {
       currentUserProfile = await Profile.findOne({ user: req.user._id });
       if (currentUserProfile) {
         // Exclude logged in user profile
+        if (query.user && query.user.$nin) {
+          query.user.$nin.push(req.user._id);
+        } else {
+          query.user = { $ne: req.user._id };
+        }
         query._id = { $ne: currentUserProfile._id };
-        query.user = { $ne: req.user._id };
 
         // Enforce strict gender matching if not explicitly requested
         const userGender = (currentUserProfile.gender || '').toLowerCase();
         if (userGender === 'bride' || userGender === 'female') {
-          query.gender = { $in: ['groom', 'male'] };
+          query.gender = { $in: ['groom', 'male', 'Groom', 'Male'] };
         } else if (userGender === 'groom' || userGender === 'male') {
-          query.gender = { $in: ['bride', 'female'] };
+          query.gender = { $in: ['bride', 'female', 'Bride', 'Female'] };
         }
       }
     }
@@ -52,9 +65,9 @@ const getProfiles = async (req, res) => {
     if (gender) {
       const gLower = gender.toLowerCase();
       if (gLower === 'bride' || gLower === 'female') {
-        query.gender = { $in: ['bride', 'female'] };
+        query.gender = { $in: ['bride', 'female', 'Bride', 'Female'] };
       } else if (gLower === 'groom' || gLower === 'male') {
-        query.gender = { $in: ['groom', 'male'] };
+        query.gender = { $in: ['groom', 'male', 'Groom', 'Male'] };
       }
     }
 
@@ -119,27 +132,49 @@ const getProfiles = async (req, res) => {
     const limitNum = parseInt(limit, 10) || 12;
     const skip = (pageNum - 1) * limitNum;
 
-    // Populate user to exclude inactive/suspended users
-    const profiles = await Profile.find(query)
+    // Fetch matching profiles populated with user
+    const rawProfiles = await Profile.find(query)
       .populate({
         path: 'user',
         select: 'accountStatus role email mobile',
-        match: { accountStatus: { $eq: 'active' } },
       })
-      .sort(sort === 'newest' ? { createdAt: -1 } : { createdAt: -1 })
-      .skip(skip)
-      .limit(limitNum);
+      .sort(sort === 'newest' ? { createdAt: -1 } : { createdAt: -1 });
 
-    // Filter out profiles whose user reference failed match (i.e. suspended or inactive user)
-    const validProfiles = profiles.filter((p) => p.user !== null);
-    const total = validProfiles.length;
+    // Exclude profiles belonging to admins or inactive users
+    const validProfiles = rawProfiles.filter((p) => {
+      if (p.user) {
+        if (p.user.role === 'admin') return false;
+        if (p.user.accountStatus !== 'active') return false;
+      }
+      return true;
+    });
 
-    const profilesWithScore = validProfiles.map((p) => {
+    const totalCount = validProfiles.length;
+    const paginatedProfiles = validProfiles.slice(skip, skip + limitNum);
+
+    const profilesWithScore = paginatedProfiles.map((p) => {
       const profileObj = p.toObject();
+      if (!profileObj.customId) {
+        profileObj.customId = `SSM${p._id.toString().slice(-6).toUpperCase()}`;
+      }
+
       if (currentUserProfile) {
         profileObj.matchPercentage = currentUserProfile.calculateMatchPercentage(p);
       } else {
-        profileObj.matchPercentage = Math.floor(Math.random() * (98 - 75 + 1)) + 75;
+        profileObj.matchPercentage = 85;
+      }
+      
+      // Strict Phone & Contact Privacy: Remove admin-only contact info for non-admins
+      if (req.user?.role !== 'admin') {
+        delete profileObj.contactPhone;
+        delete profileObj.contactAltPhone;
+        delete profileObj.contactEmail;
+        delete profileObj.contactAddress;
+        if (profileObj.user) {
+          delete profileObj.user.mobile;
+          delete profileObj.user.phone;
+          delete profileObj.user.phoneNumber;
+        }
       }
       return profileObj;
     });
@@ -149,8 +184,8 @@ const getProfiles = async (req, res) => {
       pagination: {
         page: pageNum,
         limit: limitNum,
-        total,
-        pages: Math.ceil(total / limitNum) || 1,
+        total: totalCount,
+        pages: Math.ceil(totalCount / limitNum) || 1,
       },
     });
   } catch (error) {
@@ -164,7 +199,7 @@ const getProfiles = async (req, res) => {
 // @access  Public / Optional Auth
 const getProfileById = async (req, res) => {
   try {
-    const profile = await Profile.findById(req.params.id).populate('user', 'email phone createdAt');
+    const profile = await Profile.findById(req.params.id).populate('user', 'email mobile phone createdAt role');
 
     if (!profile) {
       return res.status(404).json({ message: 'Profile not found' });
@@ -172,14 +207,51 @@ const getProfileById = async (req, res) => {
 
     const profileObj = profile.toObject();
 
-    // Check if requesting user is connected match or profile owner
-    const isOwner = req.user && req.user._id.toString() === profile.user._id.toString();
+    // Check if requesting user is profile owner or admin
+    const isOwner = req.user && profile.user && req.user._id.toString() === profile.user._id.toString();
+    const isAdmin = req.user && req.user.role === 'admin';
 
-    // Enforce Privacy Rules:
-    if (!isOwner) {
-      if (profile.privacy?.hidePhone && profileObj.user) {
-        profileObj.user.phone = '🔒 Hidden by Member';
+    // Check if contact details have been explicitly shared by Admin for this match
+    let isContactSharedByAdmin = false;
+    if (req.user && !isOwner && !isAdmin && profile.user) {
+      const Interest = require('../models/Interest');
+      const sharedInterest = await Interest.findOne({
+        $or: [
+          { sender: req.user._id, recipient: profile.user._id, status: { $in: ['contact_shared', 'closed'] } },
+          { sender: profile.user._id, recipient: req.user._id, status: { $in: ['contact_shared', 'closed'] } },
+        ],
+      });
+      if (sharedInterest && sharedInterest.contactSharedAt) {
+        isContactSharedByAdmin = true;
       }
+    }
+
+    // Check profile approval status for non-admins
+    if (!isAdmin && profileObj.status && profileObj.status !== 'Approved') {
+      return res.status(404).json({ message: 'Profile not found or pending review' });
+    }
+
+    // Enforce Strict Phone & Contact Privacy Rules:
+    if (!isAdmin && !isOwner && !isContactSharedByAdmin) {
+      delete profileObj.contactPhone;
+      delete profileObj.contactAltPhone;
+      delete profileObj.contactEmail;
+      delete profileObj.contactAddress;
+      if (profileObj.user) {
+        delete profileObj.user.mobile;
+        delete profileObj.user.phone;
+        delete profileObj.user.phoneNumber;
+        profileObj.user.email = '🔒 Hidden until Admin approves family contact';
+      }
+    } else if (isOwner && profileObj.user?.mobile) {
+      // Mask mobile for owner view (e.g. 98XXXX3210)
+      const digits = profileObj.user.mobile.replace(/\D/g, '');
+      if (digits.length >= 10) {
+        profileObj.user.maskedMobile = `${digits.slice(0, 2)}XXXX${digits.slice(-4)}`;
+      }
+    }
+
+    if (!isAdmin && !isOwner && !isContactSharedByAdmin) {
       if (profile.privacy?.hideEmail && profileObj.user) {
         profileObj.user.email = '🔒 Hidden by Member';
       }
@@ -220,13 +292,23 @@ const updateMyProfile = async (req, res) => {
       return res.status(404).json({ message: 'Profile not found for this user' });
     }
 
-    const fieldsToUpdate = req.body;
+    const fieldsToUpdate = { ...req.body };
 
     if (fieldsToUpdate.dateOfBirth) {
       const dob = new Date(fieldsToUpdate.dateOfBirth);
       const diffMs = Date.now() - dob.getTime();
       const ageDate = new Date(diffMs);
       fieldsToUpdate.age = Math.abs(ageDate.getUTCFullYear() - 1970);
+    }
+
+    if (fieldsToUpdate.wizardStep) {
+      const currentStep = Number(fieldsToUpdate.wizardStep);
+      fieldsToUpdate.wizardStep = currentStep;
+      fieldsToUpdate.lastCompletedStep = Math.max(profile.lastCompletedStep || 0, currentStep - 1);
+      if (currentStep >= 5) {
+        fieldsToUpdate.isWizardCompleted = true;
+        fieldsToUpdate.lastCompletedStep = 5;
+      }
     }
 
     profile = await Profile.findOneAndUpdate(
@@ -238,6 +320,7 @@ const updateMyProfile = async (req, res) => {
     const completeness = profile.calculateCompleteness();
     const profileObj = profile.toObject();
     profileObj.completeness = completeness;
+    profileObj.profileCompleted = profile.isWizardCompleted || completeness.score >= 90;
 
     res.json(profileObj);
   } catch (error) {
@@ -251,20 +334,34 @@ const updateMyProfile = async (req, res) => {
 // @access  Private
 const saveWizardDraft = async (req, res) => {
   try {
-    const { wizardStep, draftData } = req.body;
+    const { wizardStep, draftData, isWizardCompleted } = req.body;
     const profile = await Profile.findOne({ user: req.user._id });
 
     if (!profile) {
       return res.status(404).json({ message: 'Profile not found' });
     }
 
-    profile.wizardStep = wizardStep || profile.wizardStep;
-    profile.draftData = { ...profile.draftData, ...draftData };
+    if (wizardStep) {
+      const stepNum = Number(wizardStep);
+      profile.wizardStep = stepNum;
+      profile.lastCompletedStep = Math.max(profile.lastCompletedStep || 0, stepNum - 1);
+      if (stepNum >= 5 || isWizardCompleted) {
+        profile.isWizardCompleted = true;
+        profile.lastCompletedStep = 5;
+      }
+    }
+
+    if (draftData) {
+      profile.draftData = { ...profile.draftData, ...draftData };
+    }
+
     await profile.save();
 
     res.json({
-      message: 'Wizard draft auto-saved successfully!',
+      message: 'Wizard draft saved successfully!',
       wizardStep: profile.wizardStep,
+      lastCompletedStep: profile.lastCompletedStep,
+      isWizardCompleted: profile.isWizardCompleted,
       draftData: profile.draftData,
     });
   } catch (error) {
@@ -465,8 +562,17 @@ const toggleShortlist = async (req, res) => {
 // @access  Public
 const getFeaturedProfiles = async (req, res) => {
   try {
-    const grooms = await Profile.find({ gender: 'groom', 'privacy.hideFromSearch': { $ne: true } }).limit(4);
-    const brides = await Profile.find({ gender: 'bride', 'privacy.hideFromSearch': { $ne: true } }).limit(4);
+    const adminUsers = await User.find({ role: 'admin' }).select('_id');
+    const adminUserIds = adminUsers.map((u) => u._id);
+
+    const baseQuery = {
+      'privacy.hideFromSearch': { $ne: true },
+      status: { $in: ['Approved', undefined, null] },
+      user: { $nin: adminUserIds },
+    };
+
+    const grooms = await Profile.find({ ...baseQuery, gender: { $in: ['groom', 'male', 'Groom', 'Male'] } }).limit(4);
+    const brides = await Profile.find({ ...baseQuery, gender: { $in: ['bride', 'female', 'Bride', 'Female'] } }).limit(4);
     res.json({ grooms, brides });
   } catch (error) {
     console.error('Featured Profiles Error:', error);

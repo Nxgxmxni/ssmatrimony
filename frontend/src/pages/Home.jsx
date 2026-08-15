@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { adminAPI } from '../services/api';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -94,6 +95,15 @@ export default function Home() {
   const [activeFaqIndex, setActiveFaqIndex] = useState(0);
   const [lightboxImage, setLightboxImage] = useState(null);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [cmsHomeData, setCmsHomeData] = useState(null);
+
+  useEffect(() => {
+    adminAPI.getCmsPublicSection('homePage')
+      .then((res) => {
+        if (res.data?.data) setCmsHomeData(res.data.data);
+      })
+      .catch(() => {});
+  }, []);
   
   // Contact Form State
   const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '', time: 'Morning', message: '' });
@@ -291,7 +301,7 @@ export default function Home() {
               marginBottom: '0.6rem',
               textShadow: '0 3px 10px rgba(0,0,0,0.5)'
             }}>
-              {heroSlides[currentSlide].title}
+              {cmsHomeData?.mainHeading || heroSlides[currentSlide].title}
             </h1>
 
             {/* Subtitle Description */}
@@ -304,7 +314,7 @@ export default function Home() {
               textShadow: '0 2px 6px rgba(0,0,0,0.6)',
               fontWeight: '400'
             }}>
-              {heroSlides[currentSlide].subtitle}
+              {cmsHomeData?.heroDescription || heroSlides[currentSlide].subtitle}
             </p>
 
             {/* Action Buttons */}
@@ -1292,7 +1302,7 @@ export default function Home() {
               { icon: Heart, title: 'Family Assisted Matching', desc: 'Facilitated communication designed for respect, tradition, and mutual alignment.' },
               { icon: Lock, title: 'Privacy Protection', desc: 'Control photo and contact visibility with strict authorization parameters.' },
               { icon: CheckCircle2, title: 'Background Verification', desc: 'Thorough address, employment, and educational background checks.' },
-              { icon: MessageSquare, title: 'Secure Communication', desc: 'Safe internal chat and contact requests without revealing private details.' },
+              { icon: Heart, title: 'Managed Interest System', desc: 'Managed relationship team introductions and express interest requests without revealing private details.' },
             ].map((card, idx) => {
               const IconComp = card.icon;
               return (

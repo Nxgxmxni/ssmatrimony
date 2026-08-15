@@ -32,7 +32,29 @@ const connectDB = async () => {
     console.log(`Connecting to MongoDB... Host: ${hostInfo}`);
 
     const conn = await mongoose.connect(connUri);
-    console.log(`MongoDB Connected Successfully: ${conn.connection.host}`);
+    const User = require('../models/User');
+
+    console.log('\n=========================================================');
+    console.log('         SS MATRIMONY DATABASE AUTHENTICATION AUDIT       ');
+    console.log('=========================================================');
+    console.log(`Mongo Host:      ${conn.connection.host}`);
+    console.log(`Database Name:   ${conn.connection.name}`);
+    console.log(`Collection Name: ${User.collection.name}`);
+    console.log('---------------------------------------------------------');
+
+    const totalUsers = await User.countDocuments();
+    console.log(`Total Registered Users in MongoDB: ${totalUsers}`);
+    
+    const allUsers = await User.find().select('email mobile role authProvider accountStatus').limit(25);
+    if (allUsers.length > 0) {
+      console.log('\nExisting User Accounts in Database:');
+      allUsers.forEach((u, i) => {
+        console.log(`  [${i + 1}] ID: ${u._id} | Email: "${u.email}" | Phone: "${u.mobile || 'N/A'}" | Role: "${u.role}" | Provider: "${u.authProvider || 'local'}"`);
+      });
+    } else {
+      console.log('  No user accounts found in database. Seed required.');
+    }
+    console.log('=========================================================\n');
   } catch (error) {
     console.error(`MongoDB Connection Error: ${error.message}`);
     console.error('Tip: Make sure MONGODB_URI is properly formatted and valid.');

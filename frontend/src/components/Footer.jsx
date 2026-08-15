@@ -1,9 +1,18 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import MemberFooter from './MemberFooter';
 import Logo from './Logo';
 import { Phone, Mail, Globe, Instagram, MessageCircle, Heart } from 'lucide-react';
 
 export default function Footer() {
+  const { isAuthenticated } = useAuth();
+
+  // If user is logged in, render Member Portal Footer!
+  if (isAuthenticated) {
+    return <MemberFooter />;
+  }
+
   return (
     <footer style={{
       backgroundColor: '#051329',
@@ -32,11 +41,11 @@ export default function Footer() {
           marginBottom: '3.5rem'
         }}>
           {/* Column 1: Brand Info & Social Media */}
-          <div style={{ gridColumn: 'span 2' }}>
+          <div>
             <Link to="/" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: '1.25rem' }}>
-              <Logo height={52} variant="dark" />
+              <Logo height={72} variant="dark" />
             </Link>
-            <p style={{ fontSize: '0.9rem', lineHeight: '1.7', color: '#94A3B8', maxWidth: '380px', marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: '0.9rem', lineHeight: '1.7', color: '#94A3B8', marginBottom: '1.5rem' }}>
               <strong style={{ color: '#FFFFFF' }}>SS MATRIMONY</strong> is a premier Telugu matrimonial platform built on trust, traditional values, and verified family matching. Helping brides and grooms find their forever soulmate.
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
@@ -53,7 +62,7 @@ export default function Footer() {
                   borderRadius: '50%',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  justify: 'center',
+                  justifyContent: 'center',
                   border: '1px solid rgba(212, 175, 55, 0.3)',
                   transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                   textDecoration: 'none'
@@ -78,22 +87,7 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Column 3: Regional Communities */}
-          <div>
-            <h4 style={{ color: '#D4AF37', marginBottom: '1.25rem', fontSize: '1rem', fontFamily: 'Outfit, sans-serif', fontWeight: '700', letterSpacing: '0.5px' }}>
-              Telugu Communities
-            </h4>
-            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem', color: '#94A3B8' }}>
-              <li>Kamma Matrimony</li>
-              <li>Reddy Matrimony</li>
-              <li>Kapu &amp; Telaga Matrimony</li>
-              <li>Brahmin Matrimony</li>
-              <li>Arya Vysya Matrimony</li>
-              <li>Velama &amp; Raju Matrimony</li>
-            </ul>
-          </div>
-
-          {/* Column 4: Support & Legal */}
+          {/* Column 3: Support & Legal */}
           <div>
             <h4 style={{ color: '#D4AF37', marginBottom: '1.25rem', fontSize: '1rem', fontFamily: 'Outfit, sans-serif', fontWeight: '700', letterSpacing: '0.5px' }}>
               Support &amp; Legal
@@ -106,7 +100,7 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Column 5: Direct Support Contact */}
+          {/* Column 4: Direct Support Contact */}
           <div>
             <h4 style={{ color: '#D4AF37', marginBottom: '1.25rem', fontSize: '1rem', fontFamily: 'Outfit, sans-serif', fontWeight: '700', letterSpacing: '0.5px' }}>
               Customer Support

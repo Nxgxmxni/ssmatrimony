@@ -157,7 +157,7 @@ export default function Register() {
       >
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{ display: 'inline-block', marginBottom: '0.85rem' }}>
-            <Logo height={44} variant="light" />
+            <Logo height={60} variant="light" />
           </div>
           <h2
             style={{

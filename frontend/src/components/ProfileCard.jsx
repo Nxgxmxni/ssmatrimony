@@ -70,27 +70,49 @@ export default function ProfileCard({ profile, onOpenInterestModal, onIgnore }) 
         e.currentTarget.style.boxShadow = 'var(--shadow-md)';
       }}
     >
-      {/* Match Percentage Badge */}
-      {profile.matchPercentage && (
+      {/* Top-Left Status Badge Overlay */}
+      {isActuallyVerified ? (
         <div
           style={{
             position: 'absolute',
             top: '12px',
             left: '12px',
             zIndex: 10,
-            background: 'linear-gradient(135deg, #123B8F 0%, #0077FF 100%)',
-            color: '#FFFFFF',
+            background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+            color: '#D4AF37',
             fontWeight: '700',
             fontSize: '0.75rem',
-            padding: '0.3rem 0.65rem',
+            padding: '0.35rem 0.75rem',
             borderRadius: '20px',
-            boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+            border: '1px solid rgba(212, 175, 55, 0.4)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.3rem',
+            gap: '0.35rem',
           }}
         >
-          <Sparkles size={13} color="#FFFFFF" /> {profile.matchPercentage}% Match
+          <ShieldCheck size={14} color="#D4AF37" /> Verified Member
+        </div>
+      ) : (
+        <div
+          style={{
+            position: 'absolute',
+            top: '12px',
+            left: '12px',
+            zIndex: 10,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(8px)',
+            color: '#F8FAFC',
+            fontWeight: '700',
+            fontSize: '0.75rem',
+            padding: '0.35rem 0.75rem',
+            borderRadius: '20px',
+            border: '1px solid rgba(255,255,255,0.18)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            letterSpacing: '0.5px',
+          }}
+        >
+          {profileIdDisplay}
         </div>
       )}
 

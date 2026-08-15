@@ -10,7 +10,9 @@ export const AuthProvider = ({ children }) => {
 
   const fetchCurrentUser = async () => {
     const token = localStorage.getItem('ss_token');
-    if (!token) {
+    const refreshToken = localStorage.getItem('ss_refresh_token');
+
+    if (!token && !refreshToken) {
       setUser(null);
       setProfile(null);
       setLoading(false);
@@ -22,6 +24,23 @@ export const AuthProvider = ({ children }) => {
       setUser(res.data.user);
       setProfile(res.data.profile);
     } catch (error) {
+      if (refreshToken) {
+        try {
+          const refreshRes = await authAPI.refreshToken(refreshToken);
+          const newToken = refreshRes.data.token;
+          const newRefreshToken = refreshRes.data.refreshToken;
+          if (newToken) localStorage.setItem('ss_token', newToken);
+          if (newRefreshToken) localStorage.setItem('ss_refresh_token', newRefreshToken);
+
+          const meRes = await authAPI.getMe();
+          setUser(meRes.data.user);
+          setProfile(meRes.data.profile);
+          setLoading(false);
+          return;
+        } catch (refreshErr) {
+          console.warn('Auto refresh failed on startup:', refreshErr);
+        }
+      }
       localStorage.removeItem('ss_token');
       localStorage.removeItem('ss_refresh_token');
       setUser(null);

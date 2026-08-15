@@ -5,7 +5,7 @@ import { authAPI } from '../services/api';
 import Logo from '../components/Logo';
 import GoogleLoginButton from '../components/GoogleLoginButton';
 import Toast from '../components/Toast';
-import { LogIn, Key, Mail, Sparkles, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { LogIn, Key, Mail, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -39,11 +39,7 @@ export default function Login() {
         res.data.profile
       );
       setToastMsg('Welcome back! Login successful.');
-      const dest = res.data.role === 'admin' 
-        ? '/admin' 
-        : res.data.profile?.isWizardCompleted 
-          ? '/dashboard' 
-          : '/onboarding';
+      const dest = res.data.role === 'admin' ? '/admin' : '/dashboard';
       setTimeout(() => {
         navigate(dest);
       }, 500);
@@ -55,42 +51,52 @@ export default function Login() {
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleCredentialReceived = async (credential) => {
     try {
       setLoading(true);
-      const res = await authAPI.googleSignIn({
-        email: 'telugu.google.user@ssmatrimony.com',
-        name: 'Google Telugu User',
-        googleId: 'google-oauth-987654321',
-        picture: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-        gender: 'bride',
-      });
+      setError('');
+      const res = await authAPI.googleSignIn({ credential });
       login(
         res.data.token,
         res.data.refreshToken,
-        { _id: res.data._id, fullName: res.data.fullName, email: res.data.email, role: res.data.role },
+        {
+          _id: res.data._id,
+          fullName: res.data.fullName,
+          email: res.data.email,
+          role: res.data.role,
+        },
         res.data.profile
       );
-      setToastMsg('Google Sign-In successful!');
-      const dest = res.data.role === 'admin' 
-        ? '/admin' 
-        : res.data.profile?.isWizardCompleted 
-          ? '/dashboard' 
-          : '/onboarding';
+      setToastMsg('Google Authentication successful!');
+      
+      const dest = res.data.role === 'admin'
+        ? '/admin'
+        : res.data.isNewUser
+          ? '/onboarding'
+          : '/dashboard';
+          
       setTimeout(() => {
         navigate(dest);
       }, 500);
     } catch (err) {
       console.error('Google Sign-In error:', err);
-      setError('Google Authentication failed');
+      setError(err.response?.data?.message || 'Google Authentication failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const setDemoUser = (demoEmail, demoPassword) => {
-    setIdentifier(demoEmail);
-    setPassword(demoPassword);
+  const handleGoogleButtonClick = async () => {
+    // If standard click without Google GIS popup (e.g. fallback or manual prompt)
+    if (window.google?.accounts?.id) {
+      try {
+        window.google.accounts.id.prompt();
+        return;
+      } catch (err) {
+        console.warn('Google prompt fallback:', err);
+      }
+    }
+    setError('Please select your Google Account in the Google sign-in popup.');
   };
 
   return (
@@ -126,7 +132,7 @@ export default function Login() {
         {/* Brand Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{ display: 'inline-block', marginBottom: '0.85rem' }}>
-            <Logo height={44} variant="light" />
+            <Logo height={60} variant="light" />
           </div>
           <h2
             style={{
@@ -280,66 +286,19 @@ export default function Login() {
           <div style={{ flexGrow: 1, height: '1px', backgroundColor: '#E2E8F0' }} />
         </div>
 
-        {/* Google OAuth Button */}
-        <GoogleLoginButton onClick={handleGoogleSignIn} loading={loading} text="Sign In with Google" />
-
-        {/* Quick Demo Accounts */}
-        <div
-          style={{
-            marginTop: '1.75rem',
-            paddingTop: '1.25rem',
-            borderTop: '1px dashed #CBD5E1',
-            textAlign: 'center',
-          }}
-        >
-          <div style={{ fontSize: '0.75rem', fontWeight: '800', color: '#D4AF37', letterSpacing: '1.5px', marginBottom: '0.65rem' }}>
-            ⚡ DEMO LOGIN CREDENTIALS
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-            <button
-              type="button"
-              onClick={() => setDemoUser('rahul.sharma@example.com', 'password123')}
-              className="btn-secondary"
-              style={{ padding: '0.45rem 0.85rem', fontSize: '0.825rem', justifyContent: 'center', borderRadius: '8px' }}
-            >
-              Groom: rahul.sharma@example.com
-            </button>
-            <button
-              type="button"
-              onClick={() => setDemoUser('priya.verma@example.com', 'password123')}
-              className="btn-secondary"
-              style={{ padding: '0.45rem 0.85rem', fontSize: '0.825rem', justifyContent: 'center', borderRadius: '8px' }}
-            >
-              Bride: priya.verma@example.com
-            </button>
-            <button
-              type="button"
-              onClick={() => setDemoUser('admin@ssmatrimony.com', 'admin123')}
-              style={{
-                padding: '0.45rem 0.85rem',
-                fontSize: '0.825rem',
-                justifyContent: 'center',
-                borderRadius: '8px',
-                backgroundColor: '#FEF3C7',
-                color: '#92400E',
-                border: '1px solid #FDE68A',
-                fontWeight: '700',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-              }}
-            >
-              <Sparkles size={13} color="#D4AF37" /> Admin: admin@ssmatrimony.com
-            </button>
-          </div>
-        </div>
+        {/* Real Google OAuth 2.0 Button */}
+        <GoogleLoginButton
+          onClick={handleGoogleButtonClick}
+          onCredentialReceived={handleGoogleCredentialReceived}
+          loading={loading}
+          text="Continue with Google"
+        />
 
         {/* Footer Register Link */}
         <div style={{ textAlign: 'center', marginTop: '1.75rem', fontSize: '0.9rem', color: '#64748B' }}>
           Don't have an SS Matrimony account yet?{' '}
           <Link to="/register" style={{ fontWeight: '800', color: '#0B3B91', textDecoration: 'none' }}>
-            Register Free
+            Create Free Profile
           </Link>
         </div>
       </div>

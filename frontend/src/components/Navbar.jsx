@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import MemberNavbar from './MemberNavbar';
 import Logo from './Logo';
 import {
   LogOut,
@@ -24,6 +25,11 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // If user is logged in, render Member Portal Navbar!
+  if (isAuthenticated) {
+    return <MemberNavbar />;
+  }
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -43,7 +49,7 @@ export default function Navbar() {
     <header style={{ position: 'sticky', top: 0, zIndex: 1000 }}>
       {/* 
         ====================================================
-        MAIN STICKY LUXURY NAVIGATION BAR
+        PUBLIC WEBSITE NAVIGATION BAR (VISITORS ONLY)
         ====================================================
       */}
       <nav style={{
@@ -56,35 +62,13 @@ export default function Navbar() {
         <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1.5rem' }}>
           {/* Official Brand Logo */}
           <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
-            <Logo height={54} variant="light" />
+            <Logo height={80} variant="light" />
           </Link>
 
-          {/* Desktop Menu with Premium Animated Underline */}
+          {/* Public Desktop Menu */}
           <div className="desktop-menu" style={{ display: 'flex', alignItems: 'center', gap: '1.75rem' }}>
             {navLinks.map((link, idx) => {
               const active = link.path ? isActive(link.path) : false;
-
-              if (link.href) {
-                return (
-                  <a
-                    key={idx}
-                    href={link.href}
-                    className="nav-link-item"
-                    style={{
-                      fontWeight: '600',
-                      color: '#334155',
-                      fontSize: '0.95rem',
-                      textDecoration: 'none',
-                      position: 'relative',
-                      padding: '0.4rem 0',
-                      transition: 'color 0.25s ease'
-                    }}
-                  >
-                    {link.label}
-                    <span className="nav-underline" />
-                  </a>
-                );
-              }
 
               return (
                 <Link
@@ -108,48 +92,16 @@ export default function Navbar() {
             })}
           </div>
 
-          {/* Action Buttons */}
+          {/* Guest Action Buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            {isAuthenticated ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                <Link to="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}>
-                  <img
-                    src={profile?.photos?.[0] || '/images/profile1.svg'}
-                    alt="User avatar"
-                    style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #0B3B91' }}
-                  />
-                  <span style={{ fontWeight: '600', fontSize: '0.92rem', color: '#0F172A' }}>
-                    {profile?.fullName ? profile.fullName.split(' ')[0] : 'Dashboard'}
-                  </span>
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  title="Logout"
-                  style={{
-                    background: '#EAF4FF',
-                    color: '#0B3B91',
-                    padding: '0.5rem 0.9rem',
-                    borderRadius: '50px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    fontSize: '0.85rem',
-                    fontWeight: '600'
-                  }}
-                >
-                  <LogOut size={15} /> Logout
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <Link to="/login" className="btn-secondary" style={{ padding: '0.55rem 1.35rem', fontSize: '0.9rem' }}>
-                  Login
-                </Link>
-                <Link to="/register" className="btn-gold" style={{ padding: '0.6rem 1.5rem', fontSize: '0.9rem' }}>
-                  Create Profile
-                </Link>
-              </div>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <Link to="/login" className="btn-secondary" style={{ padding: '0.55rem 1.35rem', fontSize: '0.9rem' }}>
+                Login
+              </Link>
+              <Link to="/register" className="btn-gold" style={{ padding: '0.6rem 1.5rem', fontSize: '0.9rem' }}>
+                Create Profile
+              </Link>
+            </div>
 
             {/* Mobile Menu Toggle Button */}
             <button
@@ -172,7 +124,7 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Mobile Menu Drawer */}
+      {/* Public Mobile Menu Drawer */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
@@ -194,9 +146,9 @@ export default function Navbar() {
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {navLinks.map((link, idx) => (
-                <a
+                <Link
                   key={idx}
-                  href={link.href || link.path}
+                  to={link.path}
                   onClick={() => setMobileMenuOpen(false)}
                   style={{
                     color: '#0F172A',
@@ -208,18 +160,16 @@ export default function Navbar() {
                   }}
                 >
                   {link.label}
-                </a>
+                </Link>
               ))}
-              {!isAuthenticated && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
-                  <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="btn-secondary" style={{ textAlign: 'center', justifyContent: 'center' }}>
-                    Login
-                  </Link>
-                  <Link to="/register" onClick={() => setMobileMenuOpen(false)} className="btn-gold" style={{ textAlign: 'center', justifyContent: 'center' }}>
-                    Create Profile
-                  </Link>
-                </div>
-              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="btn-secondary" style={{ textAlign: 'center', justifyContent: 'center' }}>
+                  Login
+                </Link>
+                <Link to="/register" onClick={() => setMobileMenuOpen(false)} className="btn-gold" style={{ textAlign: 'center', justifyContent: 'center' }}>
+                  Create Profile
+                </Link>
+              </div>
             </div>
           </motion.div>
         )}
@@ -257,4 +207,3 @@ export default function Navbar() {
     </header>
   );
 }
-

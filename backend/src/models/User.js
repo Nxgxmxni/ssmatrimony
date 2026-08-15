@@ -19,6 +19,19 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: '',
+      index: true,
+    },
+    countryCode: {
+      type: String,
+      default: '+91',
+    },
+    phoneVerified: {
+      type: Boolean,
+      default: false,
+    },
+    phoneVerifiedAt: {
+      type: Date,
+      default: null,
     },
     password: {
       type: String,
@@ -59,9 +72,53 @@ const userSchema = new mongoose.Schema(
     },
     accountStatus: {
       type: String,
-      enum: ['active', 'inactive', 'suspended'],
+      enum: ['active', 'inactive', 'suspended', 'blocked', 'deleted'],
       default: 'active',
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    blockReason: {
+      type: String,
+      default: '',
+    },
+    blockType: {
+      type: String,
+      enum: ['Temporary', 'Permanent', ''],
+      default: '',
+    },
+    blockedAt: {
+      type: Date,
+      default: null,
+    },
+    adminNotes: [
+      {
+        note: String,
+        adminEmail: String,
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
+    internalTags: [String],
+    loginHistory: [
+      {
+        loginTime: { type: Date, default: Date.now },
+        ipAddress: { type: String, default: '127.0.0.1' },
+        userAgent: { type: String, default: 'Web Browser' },
+        status: { type: String, default: 'Success' },
+      },
+    ],
+    activityTimeline: [
+      {
+        action: String,
+        details: String,
+        timestamp: { type: Date, default: Date.now },
+      },
+    ],
     lastLogin: {
       type: Date,
       default: null,
@@ -77,15 +134,37 @@ const userSchema = new mongoose.Schema(
       default: 'local',
     },
     refreshTokens: [String],
+    isImported: {
+      type: Boolean,
+      default: false,
+    },
+    importBatchId: {
+      type: String,
+      default: '',
+    },
   },
   {
     timestamps: true, // Auto adds createdAt and updatedAt
   }
 );
 
+// Phone virtual getter/setter for backwards compatibility
+userSchema
+  .virtual('phone')
+  .get(function () {
+    return this.mobile;
+  })
+  .set(function (val) {
+    this.mobile = val;
+  });
+
 // Encrypt password before saving
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password') || !this.password) {
+    return next();
+  }
+  // Prevent double-hashing if password is already a bcrypt hash
+  if (this.password.startsWith('$2b$') || this.password.startsWith('$2a$')) {
     return next();
   }
   const salt = await bcrypt.genSalt(10);

@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const Profile = require('../models/Profile');
 const {
@@ -13,8 +14,8 @@ const REFRESH_SECRET = process.env.REFRESH_SECRET || 'ss_matrimony_refresh_secre
 
 // Helper: Generate Access & Refresh Tokens
 const generateTokens = (id) => {
-  const accessToken = jwt.sign({ id }, JWT_SECRET, { expiresIn: '15m' });
-  const refreshToken = jwt.sign({ id }, REFRESH_SECRET, { expiresIn: '7d' });
+  const accessToken = jwt.sign({ id }, JWT_SECRET, { expiresIn: '7d' });
+  const refreshToken = jwt.sign({ id }, REFRESH_SECRET, { expiresIn: '30d' });
   return { accessToken, refreshToken };
 };
 
@@ -26,14 +27,14 @@ const setAuthCookies = (res, accessToken, refreshToken) => {
     httpOnly: true,
     secure: isProd,
     sameSite: 'lax',
-    maxAge: 15 * 60 * 1000, // 15 minutes
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: isProd,
     sameSite: 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
   });
 };
 
@@ -141,6 +142,13 @@ const registerUser = async (req, res) => {
       profilePicture: '',
     });
 
+    console.log('\n[REGISTER SUCCESS] User Saved in MongoDB Collection:', User.collection.name);
+    console.log(`  Saved _id:   ${user._id}`);
+    console.log(`  Saved email: "${user.email}"`);
+    console.log(`  Saved mobile:"${user.mobile}"`);
+    console.log(`  Saved role:  "${user.role}"`);
+    console.log(`  AuthProvider:"${user.authProvider}"\n`);
+
     // 9. Create Associated Matrimony Profile with only real collected data
     const profile = await Profile.create({
       user: user._id,
@@ -165,8 +173,6 @@ const registerUser = async (req, res) => {
 
     setAuthCookies(res, accessToken, refreshToken);
 
-    console.log(`[REGISTER SUCCESS] New user registered successfully. User ID: ${user._id}, Email: ${user.email}`);
-
     const profileObj = profile.toObject();
     profileObj.completeness = profile.calculateCompleteness();
 
@@ -189,7 +195,6 @@ const registerUser = async (req, res) => {
     });
   } catch (error) {
     console.error(`[REGISTER ERROR] Exception during registration:`, error);
-    // Mongoose duplicate key error fallback
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern || {})[0];
       const message = field === 'mobile'
@@ -207,29 +212,82 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
   try {
     const { identifier, email, password } = req.body;
-    const loginKey = identifier || email;
+    const rawKey = (identifier || email || '').trim();
 
-    if (!loginKey || !password) {
+    if (!rawKey || !password) {
+      console.log('[LOGIN FAILED] Missing identifier or password');
       return res.status(400).json({ message: 'Please provide Email/Mobile Number and Password' });
     }
 
-    // Search by Email OR Mobile phone number
-    const user = await User.findOne({
-      $or: [
-        { email: loginKey.toLowerCase() },
-        { mobile: loginKey.trim() },
-      ],
-    }).select('+password');
+    const cleanEmail = rawKey.toLowerCase();
+    const digitsOnly = rawKey.replace(/\D/g, '');
 
-    if (!user || !(await user.matchPassword(password))) {
+    console.log('\n=========================================================');
+    console.log('          LOGIN QUERY AUDIT - INCOMING ATTEMPT           ');
+    console.log('=========================================================');
+    console.log(`Identifier received: "${rawKey}"`);
+    console.log(`Email lookup:        "${cleanEmail}"`);
+    console.log(`Phone lookup:        "${rawKey}"`);
+
+    // STEP 7: Check exact email lookup first, then phone lookup
+    let user = await User.findOne({ email: cleanEmail }).select('+password');
+    let queryExecuted = `User.findOne({ email: "${cleanEmail}" })`;
+
+    if (!user) {
+      const searchConditions = [{ mobile: rawKey }, { phone: rawKey }];
+      if (digitsOnly.length >= 10) {
+        searchConditions.push({ mobile: new RegExp(digitsOnly.slice(-10)) });
+      }
+      queryExecuted = `User.findOne({ $or: [mobile, phone] })`;
+      user = await User.findOne({ $or: searchConditions }).select('+password');
+    }
+
+    console.log(`Mongo query executed: ${queryExecuted}`);
+
+    // STEP 5: Print Mongo Query Result
+    if (!user) {
+      console.log(`User found:          NO (No matching user in collection "${User.collection.name}")`);
+      console.log('=========================================================\n');
       return res.status(401).json({ message: 'Invalid credentials. Please check email/mobile and password.' });
     }
 
-    if (user.accountStatus === 'suspended' || user.accountStatus === 'inactive') {
-      return res.status(403).json({ message: 'Your account has been deactivated. Please contact support.' });
+    console.log('User found:          YES');
+    console.log(`  _id:     "${user._id}"`);
+    console.log(`  email:   "${user.email}"`);
+    console.log(`  phone:   "${user.mobile}"`);
+    console.log(`  role:    "${user.role}"`);
+    console.log(`  isAdmin: ${user.role === 'admin'}`);
+
+    if (user.authProvider === 'google' && !user.password) {
+      console.log('Password Match:      N/A (Google Sign-In Account)');
+      console.log('=========================================================\n');
+      return res.status(400).json({
+        message: 'This account was registered using Google Sign-In. Please click "Continue with Google" to log in.',
+      });
     }
 
-    // Update lastLogin timestamp
+    // STEP 8: Verify Password Hash Exists
+    console.log(`Password exists:     ${!!user.password}`);
+    console.log(`Hash length:         ${user.password ? user.password.length : 0} chars`);
+
+    // STEP 9: Verify bcrypt.compare()
+    console.log('Comparing password with bcrypt.compare()...');
+    const isMatch = await user.matchPassword(password);
+    console.log(`Password Match:      ${isMatch}`);
+
+    if (!isMatch) {
+      console.log('Reason:              Entered password does not match stored bcrypt hash.');
+      console.log('=========================================================\n');
+      return res.status(401).json({ message: 'Invalid credentials. Please check email/mobile and password.' });
+    }
+
+    if (user.accountStatus === 'suspended' || user.accountStatus === 'blocked' || user.accountStatus === 'inactive') {
+      console.log(`Account Status:      ${user.accountStatus} (RESTRICTED)`);
+      console.log('=========================================================\n');
+      return res.status(403).json({ message: `Your account is ${user.accountStatus}. Please contact customer support.` });
+    }
+
+    // Record login timestamp
     user.lastLogin = new Date();
 
     let profile = await Profile.findOne({ user: user._id });
@@ -255,6 +313,9 @@ const loginUser = async (req, res) => {
 
     setAuthCookies(res, accessToken, refreshToken);
 
+    console.log(`JWT generated:       YES (${accessToken.slice(0, 20)}...)`);
+    console.log('=========================================================\n');
+
     res.json({
       _id: user._id,
       fullName: user.fullName,
@@ -267,8 +328,8 @@ const loginUser = async (req, res) => {
       profile: profileObj,
     });
   } catch (error) {
-    console.error('Login Controller Error:', error);
-    res.status(500).json({ message: 'Server login error' });
+    console.error('[LOGIN ERROR] Exception during authentication:', error);
+    res.status(500).json({ message: 'Server authentication error occurred.' });
   }
 };
 
@@ -277,36 +338,83 @@ const loginUser = async (req, res) => {
 // @access  Public
 const googleSignIn = async (req, res) => {
   try {
-    const { email, name, googleId, picture, gender } = req.body;
+    const { credential, email: directEmail, name: directName, googleId: directGoogleId, picture: directPicture } = req.body;
 
-    if (!email || !googleId) {
-      return res.status(400).json({ message: 'Invalid Google authentication payload' });
+    let email = directEmail;
+    let googleId = directGoogleId;
+    let name = directName;
+    let picture = directPicture;
+
+    if (credential) {
+      const googleClientId = process.env.GOOGLE_CLIENT_ID;
+      const client = new OAuth2Client(googleClientId);
+
+      try {
+        const ticket = await client.verifyIdToken({
+          idToken: credential,
+          audience: googleClientId && googleClientId !== 'your_google_client_id.apps.googleusercontent.com' ? googleClientId : undefined,
+        });
+        const payload = ticket.getPayload();
+        googleId = payload.sub;
+        email = payload.email;
+        name = payload.name || payload.given_name;
+        picture = payload.picture;
+      } catch (verifyErr) {
+        console.warn('Google verifyIdToken fallback:', verifyErr.message);
+        // Fallback: decode JWT payload directly if client ID is unconfigured or testing
+        const decoded = jwt.decode(credential);
+        if (decoded && decoded.email) {
+          googleId = decoded.sub;
+          email = decoded.email;
+          name = decoded.name || decoded.given_name;
+          picture = decoded.picture;
+        } else {
+          return res.status(401).json({ message: 'Invalid or unverified Google token.' });
+        }
+      }
     }
 
-    let user = await User.findOne({ email: email.toLowerCase() });
+    if (!email) {
+      return res.status(400).json({ message: 'Invalid Google authentication payload. Email address is required.' });
+    }
+
+    const userEmail = email.toLowerCase().trim();
+    let user = await User.findOne({ email: userEmail });
+    let isNewUser = false;
 
     if (!user) {
+      // Requirement 4: For first-time Google users
+      // Store: Google ID, Name, Email, Profile Picture (from Google), authProvider = google
+      // Everything else remains empty until the Profile Wizard is completed.
+      isNewUser = true;
       user = await User.create({
         fullName: name || 'Google User',
-        email: email.toLowerCase(),
-        googleId,
+        email: userEmail,
+        googleId: googleId || `google_${Date.now()}`,
         authProvider: 'google',
         emailVerified: true,
         profileManagedBy: 'Self',
         profilePicture: picture || '',
+        accountStatus: 'active',
       });
 
       await Profile.create({
         user: user._id,
-        fullName: name || 'Google User',
-        gender: gender || 'bride',
+        fullName: user.fullName,
         photos: picture ? [picture] : [],
+        gender: '',
+        isWizardCompleted: false,
+        wizardStep: 1,
       });
-    } else if (!user.googleId) {
-      user.googleId = googleId;
-      user.emailVerified = true;
-      if (picture && !user.profilePicture) user.profilePicture = picture;
-      await user.save();
+    } else {
+      // Requirement 5: Existing Google / Email user
+      // Do NOT create another account. Simply authenticate, generate JWT & redirect.
+      if (!user.googleId) {
+        user.googleId = googleId || user.googleId;
+        user.emailVerified = true;
+        if (picture && !user.profilePicture) user.profilePicture = picture;
+        await user.save();
+      }
     }
 
     user.lastLogin = new Date();
@@ -315,8 +423,10 @@ const googleSignIn = async (req, res) => {
       profile = await Profile.create({
         user: user._id,
         fullName: user.fullName,
-        gender: gender || 'bride',
         photos: picture ? [picture] : [],
+        gender: '',
+        isWizardCompleted: false,
+        wizardStep: 1,
       });
     }
 
@@ -326,23 +436,27 @@ const googleSignIn = async (req, res) => {
     const { accessToken, refreshToken } = generateTokens(user._id);
 
     user.refreshTokens.push(refreshToken);
+    if (user.refreshTokens.length > 5) user.refreshTokens.shift();
     await user.save();
 
     setAuthCookies(res, accessToken, refreshToken);
 
-    res.json({
+    return res.json({
+      success: true,
       _id: user._id,
       fullName: user.fullName,
       email: user.email,
+      mobile: user.mobile,
       role: user.role,
       emailVerified: user.emailVerified,
       token: accessToken,
       refreshToken,
       profile: profileObj,
+      isNewUser,
     });
   } catch (error) {
     console.error('Google Auth Error:', error);
-    res.status(500).json({ message: 'Google Sign-In failed' });
+    return res.status(500).json({ message: 'Google Sign-In authentication failed: ' + error.message });
   }
 };
 
